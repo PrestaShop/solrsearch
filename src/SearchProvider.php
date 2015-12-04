@@ -25,12 +25,18 @@ class SearchProvider implements ProductSearchProviderInterface
         $result = new ProductSearchResult;
         $pagination = new PaginationResult;
 
-        $str = $query->getSearchString();
+        $solrQuery = $query->getSearchString();
+        $solrQuery .= ' +id_lang:'.$context->getIdLang();
+        $solrQuery .= ' +id_shop:'.$context->getIdShop();
 
         $solariumQuery = $this->solarium->createSelect();
-        $solariumQuery->setQuery($str);
-        $solariumResult = $this->solarium->select($solariumQuery);
+        $solariumQuery->setQuery($solrQuery);
+        $solariumQuery->setStart(
+            ($query->getPage() - 1) * $query->getResultsPerPage()
+        );
+        $solariumQuery->setRows($query->getResultsPerPage());
 
+        $solariumResult = $this->solarium->select($solariumQuery);
         $documents = $solariumResult->getDocuments();
 
         $result->setProducts(array_map(function ($doc) {
