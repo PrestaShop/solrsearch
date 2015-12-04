@@ -26,8 +26,8 @@ class SearchProvider implements ProductSearchProviderInterface
         $pagination = new PaginationResult;
 
         $solrQuery = $query->getSearchString();
-        $solrQuery .= ' +id_lang:'.$context->getIdLang();
-        $solrQuery .= ' +id_shop:'.$context->getIdShop();
+        $solrQuery .= ' AND id_lang:'.$context->getIdLang();
+        $solrQuery .= ' AND id_shop:'.$context->getIdShop();
 
         $solariumQuery = $this->solarium->createSelect();
         $solariumQuery->setQuery($solrQuery);
