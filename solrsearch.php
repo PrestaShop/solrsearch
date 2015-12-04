@@ -67,6 +67,11 @@ class SolrSearch extends Module
 		);
 	}
 
+	public function install()
+	{
+		return parent::install() && $this->registerHook('productSearchProvider');
+	}
+
 	public function getContent()
 	{
 		$defaults = ['action' => null];
@@ -83,11 +88,35 @@ class SolrSearch extends Module
 		return $this->display(__FILE__, 'views/configuration.tpl');
 	}
 
+	private function getSolrConfig()
+	{
+		return [
+			'endpoint' => [
+				'localhost' => [
+					'host' => '127.0.0.1',
+					'port' => 8080,
+					'path' => '/solr/'
+				]
+			]
+		];
+	}
+
 	public function reindexAction()
 	{
 		$indexer = new PrestaShop\PrestaShop\Module\SolrSearch\Indexer(
-			$this->db
+			$this->db,
+			$this->getSolrConfig()
 		);
 		$indexer->index();
+	}
+
+	public function hookProductSearchProvider($params)
+	{
+		$query = $params['query'];
+		if ($query->getSearchString()) {
+			return new PrestaShop\PrestaShop\Module\SolrSearch\SearchProvider(
+				$this->getSolrConfig()
+			);
+		}
 	}
 }
