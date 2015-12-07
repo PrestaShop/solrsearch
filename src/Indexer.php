@@ -78,25 +78,20 @@ class Indexer
 
         $batchSize = 50;
         $batchPos  = 0;
-        $this->db->query($productsToIndexSQL, [], function (array $product) use ($update, $batchSize, &$batchPos) {
+        $this->db->query($productsToIndexSQL, [], function (array $product) use (&$update, $batchSize, &$batchPos) {
 
             $this->indexOne($update, $product, false);
 
             ++$batchPos;
             if ($batchPos >= $batchSize) {
                 $update->addCommit();
-                $result = $this->solarium->update($update);
+                $this->solarium->update($update);
+                $update = $this->solarium->createUpdate();
                 $batchPos = 0;
             }
         });
 
         $update->addCommit();
-        $result = $this->solarium->update($update);
-
-        if ($result->getStatus() !== 0) {
-            throw new Exception(
-                'Something went wrong while updating the products on the solr server.'
-            );
-        }
+        $this->solarium->update($update);
     }
 }
