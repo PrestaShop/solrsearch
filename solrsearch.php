@@ -31,6 +31,8 @@ require implode(DIRECTORY_SEPARATOR, [
 	__DIR__, 'vendor', 'autoload.php'
 ]);
 
+use Solarium\Client as SolariumClient;
+
 class SolrSearch extends Module
 {
 	private $db;
@@ -79,6 +81,18 @@ class SolrSearch extends Module
 		}
 	}
 
+	private function testSolrConnection()
+	{
+		$client = new SolariumClient($this->getSolrConfig());
+		$ping = $client->createPing();
+		try {
+			$client->ping($ping);
+			return true;
+		} catch (Exception $e) {
+			return false;
+		}
+	}
+
 	public function getContent()
 	{
 		$defaults = ['action' => null];
@@ -88,41 +102,110 @@ class SolrSearch extends Module
 		}
 		$params = array_merge($defaults, $params);
 
+		$errors = [];
+		$successes = [];
+
 		if ('reindex' === $params['action']) {
-			$this->reindexAction();
+			if ($this->reindexAction()) {
+				$successes[] = $this->l('Yay, successfully indexed all products!');
+			} else {
+				$errors[] = $this->l('Bloody hell it did not work!');
+			}
+		}
+
+		if (($solrConfig = Tools::getValue('solrConfig'))) {
+			$this->storeSolrConfig($solrConfig);
 		}
 
 		$fieldsForSchema = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'solr-schema-fields.xml');
 		$this->smarty->assign('fieldsForSchema', $fieldsForSchema);
+		$this->smarty->assign('solrConfig', $this->retrieveSolrConfig());
+
+		$solrConnectionOK = $this->testSolrConnection();
+		$solrSchemaOK = $this->getIndexer()->testSchema();
+		$solrOK = $solrConnectionOK && $solrSchemaOK;
+
+		Configuration::updateValue('SOLRSEARCH_SOLR_READY', $solrOK);
+
+		$this->smarty->assign('solrConnectionOK', $solrConnectionOK);
+		$this->smarty->assign('solrSchemaOK', $solrSchemaOK);
+		$this->smarty->assign('solrOK', $solrOK);
+		$this->smarty->assign('errors', $errors);
+		$this->smarty->assign('successes', $successes);
 
 		return $this->display(__FILE__, 'views/configuration.tpl');
+	}
+
+	private function storeSolrConfig(array $conf)
+	{
+		Configuration::updateValue('SOLRSEARCH_SOLR_HOST', $conf['host']);
+		Configuration::updateValue('SOLRSEARCH_SOLR_PORT', $conf['port']);
+		Configuration::updateValue('SOLRSEARCH_SOLR_PATH', $conf['path']);
+		Configuration::updateValue('SOLRSEARCH_SOLR_CORE', $conf['core']);
+		return $conf;
+	}
+
+	private function retrieveSolrConfig()
+	{
+		$defaults = [
+			'host' => '127.0.0.1',
+			'port' => 8080,
+			'path' => '/solr/',
+			'core' => null
+		];
+
+		$actual = [
+			'host' => Configuration::get('SOLRSEARCH_SOLR_HOST'),
+			'port' => (int)Configuration::get('SOLRSEARCH_SOLR_PORT'),
+			'path' => Configuration::get('SOLRSEARCH_SOLR_PATH'),
+			'core' => Configuration::get('SOLRSEARCH_SOLR_CORE')
+		];
+
+		$conf = $defaults;
+
+		foreach ($actual as $key => $value) {
+			if ($value) {
+				$conf[$key] = $value;
+			}
+		}
+
+		return $conf;
 	}
 
 	private function getSolrConfig()
 	{
 		return [
 			'endpoint' => [
-				'localhost' => [
-					'host' => '127.0.0.1',
-					'port' => 8080,
-					'path' => '/solr/'
-				]
+				'localhost' => $this->retrieveSolrConfig()
 			]
 		];
 	}
 
-    private function doIndex(array $id_products = [])
-    {
-        $indexer = new PrestaShop\PrestaShop\Module\SolrSearch\Indexer(
+	private function getIndexer()
+	{
+		return new PrestaShop\PrestaShop\Module\SolrSearch\Indexer(
 			$this->db,
 			$this->getSolrConfig()
 		);
-		$indexer->index($id_products);
+	}
+
+    private function doIndex(array $id_products = [])
+    {
+		if (Configuration::get('SOLRSEARCH_SOLR_READY')) {
+			try {
+				$this->getIndexer()->index($id_products);
+				return true;
+			} catch (Exception $e) {
+				return false;
+			}
+		} else {
+			return false;
+		}
     }
 
 	public function reindexAction()
 	{
-		$this->doIndex();
+		return $this->doIndex();
 	}
 
 	public function hookProductSearchProvider($params)

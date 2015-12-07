@@ -2,6 +2,7 @@
 
 namespace PrestaShop\PrestaShop\Module\SolrSearch;
 use Solarium\Client as SolariumClient;
+use Exception;
 
 class Indexer
 {
@@ -14,6 +15,51 @@ class Indexer
     ) {
         $this->db = $db;
         $this->solarium = new SolariumClient($solrConfig);
+    }
+
+    public function testSchema()
+    {
+        $update = $this->solarium->createUpdate();
+        try {
+            $this->indexOne($update, [
+                'id_product'    => 0,
+                'id_shop'       => 0,
+                'id_lang'       => 0,
+                'name'          => 'test name',
+                'description'   => 'test description',
+            ], true);
+
+            $update->addDeleteQuery('id:0-0-0');
+            $update->addCommit();
+            $this->solarium->update($update);
+
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    public function indexOne($update, array $product, $commit = false)
+    {
+        $doc = $update->createDocument();
+
+        $doc->id = implode('-', [
+            $product['id_product'],
+            $product['id_shop'],
+            $product['id_lang']
+        ]);
+
+        $doc->id_product    = $product['id_product'];
+        $doc->id_shop       = $product['id_shop'];
+        $doc->id_lang       = $product['id_lang'];
+        $doc->name          = $product['name'];
+        $doc->description   = $product['description'];
+
+        $update->addDocument($doc);
+
+        if ($commit) {
+            $this->solarium->update($update);
+        }
     }
 
     public function index(array $id_products)
@@ -30,25 +76,11 @@ class Indexer
 
         $update = $this->solarium->createUpdate();
 
-
         $batchSize = 50;
         $batchPos  = 0;
         $this->db->query($productsToIndexSQL, [], function (array $product) use ($update, $batchSize, &$batchPos) {
-            $doc = $update->createDocument();
 
-            $doc->id = implode('-', [
-                $product['id_product'],
-                $product['id_shop'],
-                $product['id_lang']
-            ]);
-
-            $doc->id_product    = $product['id_product'];
-            $doc->id_shop       = $product['id_shop'];
-            $doc->id_lang       = $product['id_lang'];
-            $doc->name          = $product['name'];
-            $doc->description   = $product['description'];
-
-            $update->addDocument($doc);
+            $this->indexOne($update, $product, false);
 
             ++$batchPos;
             if ($batchPos >= $batchSize) {
