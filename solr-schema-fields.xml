@@ -1,0 +1,6 @@
+<field name="id" type="string" indexed="true" stored="true" required="true"/>
+<field name="id_product" type="int" indexed="true" stored="true" required="true"/>
+<field name="id_lang" type="int" indexed="true" stored="true" required="true"/>
+<field name="id_shop" type="int" indexed="true" stored="true" required="true"/>
+<field name="name" type="text_general" indexed="true" stored="true"/>
+<field name="description" type="text_general" indexed="true" stored="true"/>

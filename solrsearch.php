@@ -92,6 +92,9 @@ class SolrSearch extends Module
 			$this->reindexAction();
 		}
 
+		$fieldsForSchema = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'solr-schema-fields.xml');
+		$this->smarty->assign('fieldsForSchema', $fieldsForSchema);
+
 		return $this->display(__FILE__, 'views/configuration.tpl');
 	}
 
