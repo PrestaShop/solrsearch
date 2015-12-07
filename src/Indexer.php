@@ -16,18 +16,24 @@ class Indexer
         $this->solarium = new SolariumClient($solrConfig);
     }
 
-    public function index()
+    public function index(array $id_products)
     {
-        $products = $this->db->query(
-            'SELECT
-                p.id_product, pl.*
+        $productsToIndexSQL = 'SELECT
+            p.id_product, pl.*
             FROM ps_product p
             INNER JOIN ps_product_lang pl
-            ON pl.id_product = p.id_product'
-        );
+                ON pl.id_product = p.id_product'
+        ;
+        if (!empty($id_products)) {
+            $productsToIndexSQL .= ' WHERE p.id_product IN ('.implode(',', array_map('intval', $id_products)).')';
+        }
 
         $update = $this->solarium->createUpdate();
-        foreach ($products as $product) {
+
+
+        $batchSize = 50;
+        $batchPos  = 0;
+        $this->db->query($productsToIndexSQL, [], function (array $product) use ($update, $batchSize, &$batchPos) {
             $doc = $update->createDocument();
 
             $doc->id = implode('-', [
@@ -43,10 +49,18 @@ class Indexer
             $doc->description   = $product['description'];
 
             $update->addDocument($doc);
-        }
+
+            ++$batchPos;
+            if ($batchPos >= $batchSize) {
+                $update->addCommit();
+                $result = $this->solarium->update($update);
+                $batchPos = 0;
+            }
+        });
 
         $update->addCommit();
         $result = $this->solarium->update($update);
+
         if ($result->getStatus() !== 0) {
             throw new Exception(
                 'Something went wrong while updating the products on the solr server.'

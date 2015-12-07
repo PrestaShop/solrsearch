@@ -69,7 +69,14 @@ class SolrSearch extends Module
 
 	public function install()
 	{
-		return parent::install() && $this->registerHook('productSearchProvider');
+		return parent::install() && $this->registerHook('productSearchProvider') && $this->registerHook('afterSaveProduct');
+	}
+
+	public function hookAfterSaveProduct(array $product)
+	{
+		if (isset($product['id_product'])) {
+			$this->doIndex([$product['id_product']]);
+		}
 	}
 
 	public function getContent()
@@ -101,13 +108,18 @@ class SolrSearch extends Module
 		];
 	}
 
-	public function reindexAction()
-	{
-		$indexer = new PrestaShop\PrestaShop\Module\SolrSearch\Indexer(
+    private function doIndex(array $id_products = [])
+    {
+        $indexer = new PrestaShop\PrestaShop\Module\SolrSearch\Indexer(
 			$this->db,
 			$this->getSolrConfig()
 		);
-		$indexer->index();
+		$indexer->index($id_products);
+    }
+
+	public function reindexAction()
+	{
+		$this->doIndex();
 	}
 
 	public function hookProductSearchProvider($params)

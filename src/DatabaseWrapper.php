@@ -21,13 +21,19 @@ class DatabaseWrapper
         return str_replace('ps_', $this->tablesPrefix, $sql);
     }
 
-    public function query($sql, array $params = [])
+    public function query($sql, array $params = [], callable $withRow = null)
     {
         $stm = $this->pdo->prepare($this->addTablesPrefix($sql));
         $ok  = $stm->execute($params);
         if (!$ok) {
             throw new Exception(implode(' ', $stm->errorInfo()));
         }
-        return $stm->fetchAll(PDO::FETCH_ASSOC);
+        if (null !== $withRow) {
+            while (($row = $stm->fetch(PDO::FETCH_ASSOC))) {
+                $withRow($row);
+            }
+        } else {
+            return $stm->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 }
