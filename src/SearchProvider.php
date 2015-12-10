@@ -7,7 +7,6 @@ use PrestaShop\PrestaShop\Core\Business\Product\Search\ProductSearchProviderInte
 use PrestaShop\PrestaShop\Core\Business\Product\Search\ProductSearchQuery;
 use PrestaShop\PrestaShop\Core\Business\Product\Search\ProductSearchContext;
 use PrestaShop\PrestaShop\Core\Business\Product\Search\ProductSearchResult;
-use PrestaShop\PrestaShop\Core\Business\Product\Search\Pagination;
 
 class SearchProvider implements ProductSearchProviderInterface
 {
@@ -23,7 +22,6 @@ class SearchProvider implements ProductSearchProviderInterface
         ProductSearchQuery $query
     ) {
         $result = new ProductSearchResult;
-        $pagination = new Pagination;
 
         $solrQuery = $query->getSearchString();
         $solrQuery .= ' AND id_lang:'.$context->getIdLang();
@@ -39,14 +37,13 @@ class SearchProvider implements ProductSearchProviderInterface
         $solariumResult = $this->solarium->select($solariumQuery);
         $documents = $solariumResult->getDocuments();
 
-        $result->setProducts(array_map(function ($doc) {
-            return ['id_product' => $doc->id_product];
-        }, $documents));
+        $result
+            ->setProducts(array_map(function ($doc) {
+                return ['id_product' => $doc->id_product];
+            }, $documents))
+            ->setTotalProductsCount($solariumResult->getNumFound())
+        ;
 
-        $pagination->setTotalResultsCount($solariumResult->getNumFound());
-        $pagination->setResultsCount(count($documents));
-
-        $result->setPagination($pagination);
         return $result;
     }
 }
